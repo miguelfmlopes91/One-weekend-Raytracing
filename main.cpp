@@ -11,6 +11,8 @@
 
 ///returns color of the background, simple gradient
 ///linear blend / lerp / linear interpolation
+///A lerp is always of the form:
+///blended_value = (1-t)*start_value + t*end_value, with tgoing from zero to one.
 vec3 color(const ray& r) {
     vec3 unit_direction = unit_vector(r.direction());
     float t = 0.5*(unit_direction.y() + 1.0);
