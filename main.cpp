@@ -7,39 +7,29 @@
 //
 
 #include <iostream>
-#include "ray.h"
-
-
-bool hit_sphere(const vec3& center, float radius, const ray& r){
-    vec3 oc = r.origin() - center;
-    float a = dot(r.direction(), r.direction());
-    float b = 2.0 * dot(oc, r.direction());
-    float c = dot(oc, oc) - radius*radius;
-    float discriminant = b*b - 4*a*c;
-    return (discriminant > 0); //formula resolvente de func quadrática
-}
+#include "sphere.h"
+#include "hitable_list.h"
+#include <cfloat>
 
 ///returns color of the background, simple gradient
 ///linear blend / lerp / linear interpolation
 ///A lerp is always of the form:
 ///blended_value = (1-t)*start_value + t*end_value, with tgoing from zero to one.
-vec3 color(const ray& r) {
+vec3 color(const ray& r, hitable* world){
+    hit_record rec;
     
-    //test
-    if (hit_sphere(vec3(0,0,1), 0.5, r)) {
-        return vec3(1, 0, 0);
+    if (world->hit(r, 0.0, MAXFLOAT, rec)) {
+        return 0.5 * vec3(rec.normal.x()+1, rec.normal.y()+1, rec.normal.z()+1);
+    } else {
+        vec3 unit_direction = unit_vector(r.direction());
+        float t = 0.5*(unit_direction.y() + 1.0);
+        //p(t) = A + t*B
+        ///Here p​ is a 3D position along a line in 3D.
+        ///A​ is the ray origin and B​ is the ray direction.
+        ///The ray parameter t is a real number.
+        return (1.0-t)*vec3(1.0, 1.0, 1.0) + t*vec3(0.5, 0.7, 1.0);
     }
-    vec3 unit_direction = unit_vector(r.direction());
-    float t = 0.5*(unit_direction.y() + 1.0);
-    
-    //p(t) = A + t*B
-    ///Here p​ is a 3D position along a line in 3D.
-    ///A​ is the ray origin and B​ is the ray direction.
-    ///The ray parameter t is a real number.
-    
-    return (1.0 - t)*vec3(1.0, 1.0, 1.0) + t*vec3(0.5, 0.7, 1.0);
 }
-
 
 
 int main(int argc, const char * argv[]) {
@@ -53,6 +43,11 @@ int main(int argc, const char * argv[]) {
     vec3 vertical(0.0, 2.0, 0.0);
     vec3 origin(0.0, 0.0, 0.0);
     
+    hitable* list[2];
+    list[0] = new sphere(vec3(0,0,-1), 0.5);
+    list[1] = new sphere(vec3(0.0,-100.5,-1), 100);
+    hitable* world = new hitable_list(list, 2);
+    
     for (int j = ny - 1; j >= 0; j--) {
         for (int i = 0; i < nx; i++) {
             
@@ -61,7 +56,9 @@ int main(int argc, const char * argv[]) {
             
             ray r(origin,
                   lower_left_corner + u*horizontal + v*vertical);
-            vec3 col = color(r);
+            
+            vec3 p = r.point_at_parameter(2.0);
+            vec3 col = color(r, world);
             
             int ir = int(255.99*col[0]);
             int ig = int(255.99*col[1]);
