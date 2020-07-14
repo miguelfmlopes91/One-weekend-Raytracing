@@ -6,6 +6,7 @@
 //  Copyright © 2020 Miguel Lopes. All rights reserved.
 //
 
+#pragma once
 #include "vec3.h"
 
 class ray {

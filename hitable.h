@@ -7,7 +7,6 @@
 //
 
 #pragma once
-
 #include "ray.h"
 
 struct hit_record {
