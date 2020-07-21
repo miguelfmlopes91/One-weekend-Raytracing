@@ -6,81 +6,85 @@
 //  Copyright © 2020 Miguel Lopes. All rights reserved.
 //
 
+#include "constants.h"
+#include "color.h"
 #include "sphere.h"
 #include "hitable_list.h"
 #include "camera.h"
+#include "material.h"
 #include <cfloat>
+#include <iostream>
 
+bool hit_sphere(const point3& center, double radius, const ray& r) {
+    vec3 oc = r.origin() - center;
+    auto a = r.direction().length_squared();
+    auto half_b = dot(oc, r.direction());
+    auto c = oc.length_squared() - radius*radius;
+    auto discriminant = half_b*half_b - a*c;
 
-vec3 random_in_unit_sphere(){
-    vec3 p;
-    
-    do {
-        p = 2.0*vec3(drand48(), drand48(), drand48()) - vec3(1, 1, 1);
-    } while (p.squared_length() >= 1.0);
-    
-    return p;
+    if (discriminant < 0) {
+        return -1.0;
+    } else {
+        return (-half_b - sqrt(discriminant) ) / a;
+    }
 }
 
-///returns color of the background, simple gradient
-///linear blend / lerp / linear interpolation
-///A lerp is always of the form:
-///blended_value = (1-t)*start_value + t*end_value, with tgoing from zero to one.
-vec3 color(const ray& r, hitable* world){
+///I then did a standard graphics trick of scaling that to 0.0≤𝑡≤1.0. When 𝑡=1.0 I want blue. When 𝑡=0.0 I want white. In between, I want a blend. This forms a “linear blend”, or “linear interpolation”, or “lerp” for short, between two things. A lerp is always of the form
+
+// blendedValue = (1−𝑡)⋅startValue+𝑡⋅endValue,
+color ray_color(const ray& r, const hittable& world, int depth) {
     hit_record rec;
+    // If we've exceeded the ray bounce limit, no more light is gathered.
+    if (depth <= 0)
+        return color(0,0,0);
     
-    if (world->hit(r, 0.001, MAXFLOAT, rec)) {
-        vec3 target = rec.p + rec.normal + random_in_unit_sphere();
-        return 0.5 * color(ray(rec.p, target - rec.p), world);
-    } else {
-        vec3 unit_direction = unit_vector(r.direction());
-        float t = 0.5*(unit_direction.y() + 1.0);
-        //p(t) = A + t*B
-        ///Here p​ is a 3D position along a line in 3D.
-        ///A​ is the ray origin and B​ is the ray direction.
-        ///The ray parameter t is a real number.
-        return (1.0-t)*vec3(1.0, 1.0, 1.0) + t*vec3(0.5, 0.7, 1.0);
+    if (world.hit(r, 0, infinity, rec)) {
+        point3 target = rec.p + rec.normal + random_in_unit_sphere();
+        return 0.5 * ray_color(ray(rec.p, target - rec.p), world, depth-1);
     }
+    
+    vec3 unit_direction = unit_vector(r.direction());
+    auto t = 0.5*(unit_direction.y() + 1.0);
+    return (1.0-t)*color(1.0, 1.0, 1.0) + t*color(0.5, 0.7, 1.0);
 }
 
 
 int main(int argc, const char * argv[]) {
+    const auto aspect_ratio = 16.0 / 9.0;
+    const int image_width = 384;
+    const int image_height = static_cast<int>(image_width / aspect_ratio);
+    const int samples_per_pixel = 100;
+    const int max_depth = 50;
+
     
-    int nx = 200;
-    int ny = 100;
-    int ns = 100;
-    std::cout<< "P3\n" << nx << " " << ny << "\n255\n";
+    std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
     
-    hitable* list[2];
-    list[0] = new sphere(vec3(0,0,-1), 0.5);
-    list[1] = new sphere(vec3(0.0,-100.5,-1), 100);
-    hitable* world = new hitable_list(list, 2);
+    auto viewport_height = 2.0;
+       auto viewport_width = aspect_ratio * viewport_height;
+       auto focal_length = 1.0;
+
+       auto origin = point3(0, 0, 0);
+       auto horizontal = vec3(viewport_width, 0, 0);
+       auto vertical = vec3(0, viewport_height, 0);
+       auto lower_left_corner = origin - horizontal/2 - vertical/2 - vec3(0, 0, focal_length);
+
+    hittable_list world;
+    world.add(make_shared<sphere>(point3(0,0,-1), 0.5));
+    world.add(make_shared<sphere>(point3(0,-100.5,-1), 100));
     
     camera cam;
-    for (int j = ny - 1; j >= 0; j--) {
-        for (int i = 0; i < nx; i++) {
-            vec3 col(0, 0, 0);
-            for (int s=0; s < ns; s++) {
-                float u = float(i + drand48()) / float(nx);
-                float v = float(j + drand48()) / float(ny);
-                
+
+    for (int j = image_height-1; j >= 0; --j) {
+        for (int i = 0; i < image_width; ++i) {
+            color pixel_color(0, 0, 0);
+            for (int s = 0; s < samples_per_pixel; ++s) {
+                auto u = (i + random_double()) / (image_width-1);
+                auto v = (j + random_double()) / (image_height-1);
                 ray r = cam.get_ray(u, v);
-                vec3 p = r.point_at_parameter(2.0);
-                col += color(r, world);
+                pixel_color += ray_color(r, world, max_depth);
             }
-            
-            col /= float(ns);
-            col = vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
-            
-            
-            int ir = int(255.99*col[0]);
-            int ig = int(255.99*col[1]);
-            int ib = int(255.99*col[2]);
-            
-            std::cout<< ir << " "<< ig << " " << ib << std::endl;;
+            write_color(std::cout, pixel_color, samples_per_pixel);
         }
     }
-    
-    
     return 0;
 }
