@@ -7,22 +7,17 @@
 //
 
 #pragma once
+#include "constants.h"
 #include <random>
 #include <cstdlib>
 
 class material {
-public:
-    virtual bool scatter(const ray& r_in,
-                         const hit_record& rec,
-                         vec3& attenuation,
-                         ray& scattered) const = 0;
-    
-
-    vec3 reflect(const vec3& v, const vec3& n) const {
-         return v - 2*dot(v,n)*n;
-    }
-    
-
+    public:
+        virtual bool scatter(const ray& r_in,
+                             const hit_record& rec,
+                             color& attenuation,
+                             ray& scattered
+                                                ) const = 0;
 };
 
 //vec3 random_in_unit_sphere() {
@@ -36,34 +31,35 @@ public:
 
 class lambertian : public material {
     public:
-        lambertian(const vec3& a) : albedo(a) {}
-        virtual bool scatter(const ray& r_in, const hit_record& rec, vec3& attenuation, ray& scattered) const  {
-             vec3 target = rec.p + rec.normal + random_in_unit_sphere();
-             scattered = ray(rec.p, target-rec.p);
-             attenuation = albedo;
-             return true;
+        lambertian(const color& a) : albedo(a) {}
+
+        virtual bool scatter(
+            const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered
+        ) const {
+            vec3 scatter_direction = rec.normal + random_unit_vector();
+            scattered = ray(rec.p, scatter_direction);
+            attenuation = albedo;
+            return true;
         }
 
-        vec3 albedo;
+    public:
+        color albedo;
 };
 
 
 class metal : public material {
     public:
-    metal(const vec3& a, float f) : albedo(a) {
-        if(f < 1) fuzz = f;
-        else fuzz = 1;
-    }
-    
-        virtual bool scatter(const ray& r_in,
-                             const hit_record& rec,
-                             vec3& attenuation,
-                             ray& scattered) const  {
+        metal(const color& a) : albedo(a) {}
+
+        virtual bool scatter(
+            const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered
+        ) const {
             vec3 reflected = reflect(unit_vector(r_in.direction()), rec.normal);
-            scattered = ray(rec.p, reflected + fuzz*random_in_unit_sphere());
+            scattered = ray(rec.p, reflected);
             attenuation = albedo;
             return (dot(scattered.direction(), rec.normal) > 0);
         }
-        vec3 albedo;
-        float fuzz;
+
+    public:
+        color albedo;
 };
